@@ -1,0 +1,24 @@
+{
+	"compilerOptions": {
+		"rootDir": "./src",
+		"outDir": "./dist",
+		"module": "commonjs",
+		"moduleResolution": "node",
+		"target": "es2023",
+		"lib": ["es2023"],
+		"types": ["node"],
+		"noUnusedLocals": false,
+		"noUnusedParameters": false,
+		"sourceMap": false,
+		"experimentalDecorators": true,
+		"emitDecoratorMetadata": true,
+		"esModuleInterop": true,
+		"allowSyntheticDefaultImports": true,
+		"strict": true,
+		"strictPropertyInitialization": false,
+		"forceConsistentCasingInFileNames": true,
+		"incremental": false,
+		"skipLibCheck": true
+	},
+	"include": ["src/**/*.ts"]
+}

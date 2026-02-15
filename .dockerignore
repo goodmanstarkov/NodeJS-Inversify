@@ -1,0 +1,8 @@
+# Всё кроме нужного для сборки
+*
+!package.json
+!package-lock.json
+!tsconfig.json
+!prisma.config.ts
+!prisma
+!src
