@@ -11,6 +11,8 @@ import { JwtService } from './jwt/jwt.service'
 import { IJwtService } from './jwt/jwt.service.interface'
 import { ILogger } from './logger/logger.interface'
 import { LoggerService } from './logger/logger.service'
+import { RedisService } from './redis/redis.service'
+import { IRedisService } from './redis/redis.service.interface'
 import { TYPES } from './types'
 import { UserController } from './users/user.controller'
 import { IUserController } from './users/user.controller.interface'
@@ -42,6 +44,7 @@ export const appBindings = new ContainerModule(({ bind }) => {
 	bind<IConfigService>(TYPES.IConfigService).to(ConfigService).inSingletonScope()
 	bind<IJwtService>(TYPES.IJwtService).to(JwtService).inSingletonScope()
 	bind<IPrismaService>(TYPES.IPrismaService).to(PrismaService)
+	bind<IRedisService>(TYPES.IRedisService).to(RedisService).inSingletonScope()
 	bind<App>(TYPES.Application).to(App)
 })
 

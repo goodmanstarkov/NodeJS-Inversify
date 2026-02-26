@@ -21,4 +21,6 @@ export const TYPES = {
 	IPrismaService: Symbol.for('IPrismaService'),
 	/** Идентификатор сервиса JWT-токенов */
 	IJwtService: Symbol.for('IJwtService'),
+	/** Идентификатор сервиса Redis */
+	IRedisService: Symbol.for('IRedisService'),
 }

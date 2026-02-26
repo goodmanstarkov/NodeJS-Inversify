@@ -8,7 +8,7 @@
 	"type": "commonjs",
 	"main": "src/main.ts",
 	"scripts": {
-		"dev": "npm run docker:postgres && npm run migrate:generate && npm run migrate:deploy && nodemon",
+		"dev": "npm run docker:postgres && npm run docker:redis && npm run migrate:generate && npm run migrate:deploy && nodemon",
 		"build": "tsc",
 		"dev:clean": "npm run clean && npm ci && npm run dev",
 		"build:clean": "npm run clean && npm ci && npm run build",
@@ -25,7 +25,8 @@
 		"lint:fix": "eslint src/**/*.ts --fix",
 		"prettier": "prettier --write \"src/**/*.{ts,json}\"",
 		"docker:up": "docker compose up -d --build",
-		"docker:postgres": "docker compose up -d postgres"
+		"docker:postgres": "docker compose up -d postgres",
+		"docker:redis": "docker compose up -d redis"
 	},
 	"dependencies": {
 		"@prisma/adapter-pg": "^7.4.0",
@@ -38,6 +39,7 @@
 		"dotenv": "^17.2.4",
 		"express": "^5.2.1",
 		"inversify": "^7.11.0",
+		"ioredis": "^5.9.3",
 		"jsonwebtoken": "^9.0.3",
 		"lodash": "^4.17.23",
 		"pg": "^8.18.0",

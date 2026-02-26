@@ -3,6 +3,7 @@ import { inject, injectable } from 'inversify'
 
 import { IConfigService } from '../config/config.service.interface'
 import { IJwtService, ITokenPair } from '../jwt/jwt.service.interface'
+import { IRedisService } from '../redis/redis.service.interface'
 import { TYPES } from '../types'
 
 import { UserLoginDTO } from './dto/user-login.dto'
@@ -24,10 +25,14 @@ export class UserService implements IUserService {
 	 * @param userRepository - Репозиторий пользователей для доступа к данным
 	 * @param jwtService - Сервис JWT для генерации токенов
 	 */
+	/** TTL кэша пользователя в секундах (5 минут) */
+	private static readonly USER_CACHE_TTL = 300
+
 	constructor(
 		@inject(TYPES.IConfigService) private readonly configService: IConfigService,
 		@inject(TYPES.IUserRepository) private readonly userRepository: IUserRepository,
 		@inject(TYPES.IJwtService) private readonly jwtService: IJwtService,
+		@inject(TYPES.IRedisService) private readonly redisService: IRedisService,
 	) {}
 
 	/**
@@ -92,7 +97,20 @@ export class UserService implements IUserService {
 	 * @returns Данные пользователя без пароля или null, если не найден
 	 */
 	public async getUserInfo(email: string): Promise<Omit<UserModel, 'password'> | null> {
-		return this.userRepository.findByEmailPublic(email)
+		const cacheKey = `user:${email}`
+		const cached = await this.redisService.get(cacheKey)
+
+		if (cached) {
+			return JSON.parse(cached) as Omit<UserModel, 'password'>
+		}
+
+		const user = await this.userRepository.findByEmailPublic(email)
+
+		if (user) {
+			await this.redisService.set(cacheKey, JSON.stringify(user), UserService.USER_CACHE_TTL)
+		}
+
+		return user
 	}
 
 	/**

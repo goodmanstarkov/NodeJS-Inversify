@@ -8,6 +8,7 @@ import { IConfigService } from '../config/config.service.interface'
 import { HttpError } from '../errors/http-error.class'
 import { IJwtService } from '../jwt/jwt.service.interface'
 import { ILogger } from '../logger/logger.interface'
+import { IRedisService } from '../redis/redis.service.interface'
 import { TYPES } from '../types'
 
 import { UserLoginDTO } from './dto/user-login.dto'
@@ -34,6 +35,7 @@ export class UserController extends BaseController implements IUserController {
 		@inject(TYPES.ILogger) loggerService: ILogger,
 		@inject(TYPES.IUserService) private readonly userService: IUserService,
 		@inject(TYPES.IJwtService) private readonly jwtService: IJwtService,
+		@inject(TYPES.IRedisService) private readonly redisService: IRedisService,
 	) {
 		super(loggerService)
 
@@ -81,6 +83,18 @@ export class UserController extends BaseController implements IUserController {
 		return days * 24 * 60 * 60 * 1000 // 7 дней в миллисекундах.
 	}
 
+	/** Возвращает TTL refresh-токена в секундах для хранения в Redis */
+	private get refreshTokenTtlSeconds(): number {
+		const days = parseInt(this.configService.get('JWT_REFRESH_EXPIRES_IN'), 10)
+
+		return days * 24 * 60 * 60
+	}
+
+	/** Формирует Redis-ключ для хранения refresh-токена */
+	private refreshTokenKey(token: string): string {
+		return `refresh:${token}`
+	}
+
 	/**
 	 * Обрабатывает вход пользователя в систему.
 	 * Валидирует учётные данные и при успехе возвращает access-токен
@@ -99,6 +113,12 @@ export class UserController extends BaseController implements IUserController {
 		if (!result) {
 			return next(new HttpError(401, 'Неверный email или пароль', 'users/login'))
 		}
+
+		await this.redisService.set(
+			this.refreshTokenKey(result.refreshToken),
+			result.refreshToken,
+			this.refreshTokenTtlSeconds,
+		)
 
 		this.setRefreshTokenCookie(res, result.refreshToken)
 		this.ok(res, { accessToken: result.accessToken })
@@ -122,6 +142,12 @@ export class UserController extends BaseController implements IUserController {
 		if (!result) {
 			return next(new HttpError(422, 'Такой пользователь уже существует', 'users/register'))
 		}
+
+		await this.redisService.set(
+			this.refreshTokenKey(result.tokens.refreshToken),
+			result.tokens.refreshToken,
+			this.refreshTokenTtlSeconds,
+		)
 
 		this.setRefreshTokenCookie(res, result.tokens.refreshToken)
 		this.created(res, { user: result.user, accessToken: result.tokens.accessToken })
@@ -159,9 +185,25 @@ export class UserController extends BaseController implements IUserController {
 			return next(new HttpError(401, 'Refresh токен не предоставлен', 'users/refresh'))
 		}
 
+		const isWhitelisted = await this.redisService.exists(this.refreshTokenKey(refreshToken))
+
+		if (!isWhitelisted) {
+			this.clearRefreshTokenCookie(res)
+			return next(new HttpError(401, 'Refresh токен отозван', 'users/refresh'))
+		}
+
 		try {
 			const payload = await this.jwtService.verifyRefreshToken(refreshToken)
+
+			await this.redisService.del(this.refreshTokenKey(refreshToken))
+
 			const tokens = await this.jwtService.generateTokenPair({ email: payload.email })
+
+			await this.redisService.set(
+				this.refreshTokenKey(tokens.refreshToken),
+				tokens.refreshToken,
+				this.refreshTokenTtlSeconds,
+			)
 
 			this.setRefreshTokenCookie(res, tokens.refreshToken)
 			this.ok(res, { accessToken: tokens.accessToken })
@@ -178,7 +220,13 @@ export class UserController extends BaseController implements IUserController {
 	 * @param res - HTTP-ответ
 	 * @param _next - Функция next (не используется)
 	 */
-	public async logout(_req: Request, res: Response, _next: NextFunction): Promise<void> {
+	public async logout(req: Request, res: Response, _next: NextFunction): Promise<void> {
+		const refreshToken = req.cookies[this.jwtRefreshTokenCookieName] as string | undefined
+
+		if (refreshToken) {
+			await this.redisService.del(this.refreshTokenKey(refreshToken))
+		}
+
 		this.clearRefreshTokenCookie(res)
 		this.ok(res, { message: 'Вы вышли из системы' })
 	}

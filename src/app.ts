@@ -9,6 +9,7 @@ import { IPrismaService } from './database/prisma.service.interface'
 import { IExceptionFilter } from './errors/exception.filter.interface'
 import { IJwtService } from './jwt/jwt.service.interface'
 import { ILogger } from './logger/logger.interface'
+import { IRedisService } from './redis/redis.service.interface'
 import { TYPES } from './types'
 import { IUserController } from './users/user.controller.interface'
 
@@ -44,6 +45,8 @@ export class App {
 		private readonly prismaService: IPrismaService,
 		@inject(TYPES.IJwtService)
 		private readonly jwtService: IJwtService,
+		@inject(TYPES.IRedisService)
+		private readonly redisService: IRedisService,
 	) {
 		this.app = express()
 	}
@@ -76,10 +79,10 @@ export class App {
 	 * При получении сигналов SIGINT или SIGTERM закрывает HTTP-сервер
 	 * и отключается от базы данных.
 	 */
-	private useGracefulShutdownDB(): void {
+	private useGracefulShutdown(): void {
 		const shutdown = async (): Promise<void> => {
 			this.server.close()
-			await this.prismaService.disconnect()
+			await Promise.all([this.prismaService.disconnect(), this.redisService.disconnect()])
 		}
 
 		process.on('SIGINT', shutdown)
@@ -94,8 +97,8 @@ export class App {
 		this.useMiddleware()
 		this.useRoutes()
 		this.useExceptionFilter()
-		await this.prismaService.connect()
-		this.useGracefulShutdownDB()
+		await Promise.all([this.prismaService.connect(), this.redisService.connect()])
+		this.useGracefulShutdown()
 		this.server = this.app.listen(this.port)
 
 		this.logger.log(`[App] Сервер запущен на http://localhost:${this.port}`)
